@@ -144,6 +144,7 @@ impl Map {
         }
     }
 }
+
 fn main() {
     let arg = std::env::args().skip(1).next().unwrap();
     let file_content = std::fs::read_to_string(arg).unwrap();
