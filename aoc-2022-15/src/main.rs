@@ -55,11 +55,7 @@ fn intersect(sensor_beacon: &SensorBeacon, y: i32) -> Option<std::ops::RangeIncl
     }
 }
 
-fn process_row(
-    y: i32,
-    sensors_and_beacons: &Vec<SensorBeacon>,
-    max_x: i32,
-) -> Option<Coord> {
+fn process_row(y: i32, sensors_and_beacons: &Vec<SensorBeacon>, max_x: i32) -> Option<Coord> {
     let mut candidates: Vec<bool> = vec![true; max_x as usize + 1];
     for sb in sensors_and_beacons {
         if let Some(range) = intersect(&sb, y) {
@@ -106,7 +102,7 @@ fn process_range(from: i32, to: i32, tqdm_pos: u16) {
                 "({},{}) -> {}",
                 coord.x,
                 coord.y,
-                coord.x * 4_000_000 + coord.y
+                coord.x as i64 * 4_000_000 + coord.y as i64
             );
         }
     }
