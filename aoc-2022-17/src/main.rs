@@ -1,60 +1,72 @@
 use kdam::tqdm;
-use std::collections::HashSet;
 
-#[derive(Debug, PartialEq)]
 enum Jet {
     Left,
     Right,
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 struct Coord {
     x: i64,
     y: i64,
 }
 
 struct Chamber {
-    rocks: HashSet<Coord>,
+    rocks: Vec<[bool; 7]>,
 }
 
 impl Chamber {
     fn new() -> Self {
-        Self {
-            rocks: HashSet::new(),
-        }
+        Self { rocks: Vec::new() }
     }
 
-    fn top(&self) -> i64 {
-        self.rocks.iter().map(|c| c.y).max().unwrap_or(0)
+    fn top(&self) -> usize {
+        for y in (0..self.rocks.len()).rev() {
+            if self.rocks[y].iter().any(|&x| x) {
+                return y + 1;
+            }
+        }
+        return 0;
     }
 
     fn add_rock(&mut self, jet_pattern: &mut impl Iterator<Item = Jet>, rock: &[Coord]) {
-        let top = self.top();
+        let top = self.top() as i64;
         //println!("Top is now {}", top);
-        let mut rock: HashSet<Coord> = HashSet::from_iter(rock.iter().map(|c| Coord {
-            x: c.x + 2,
-            y: c.y + top + 3 + 1,
-        }));
+        let mut rock: Vec<Coord> = rock
+            .iter()
+            .map(|c| Coord {
+                x: c.x + 2,
+                y: c.y + top + 3,
+            })
+            .collect();
 
         let mut downs = 0;
         loop {
             let push = jet_pattern.next().unwrap();
-            let candidate = HashSet::from_iter(rock.iter().map(|c| Coord {
-                x: match push {
-                    Jet::Left => c.x - 1,
-                    Jet::Right => c.x + 1,
-                },
-                y: c.y,
-            }));
+            let candidate: Vec<Coord> = rock
+                .iter()
+                .map(|c| Coord {
+                    x: match push {
+                        Jet::Left => c.x - 1,
+                        Jet::Right => c.x + 1,
+                    },
+                    y: c.y,
+                })
+                .collect();
             //println!("About to move {:?}: {:?}", push, candidate);
             if !self.is_collision(&candidate, downs >= 3) {
                 rock = candidate;
             }
 
-            let candidate = HashSet::from_iter(rock.iter().map(|c| Coord { x: c.x, y: c.y - 1 }));
+            let candidate: Vec<Coord> = rock.iter().map(|c| Coord { x: c.x, y: c.y - 1 }).collect();
             //println!("About to move down: {:?}", candidate);
             if self.is_collision(&candidate, downs >= 3) {
-                self.rocks.extend(rock.iter().cloned());
+                for c in rock {
+                    let y = c.y as usize;
+                    if y >= self.rocks.len() {
+                        self.rocks.resize((c.y + 1) as usize, [false; 7]);
+                    }
+                    self.rocks[y][c.x as usize] = true;
+                }
                 break;
             } else {
                 rock = candidate;
@@ -63,14 +75,12 @@ impl Chamber {
         }
     }
 
-    fn is_collision(&self, candidate: &HashSet<Coord>, with_other_rocks: bool) -> bool {
+    fn is_collision(&self, candidate: &Vec<Coord>, with_other_rocks: bool) -> bool {
         for c in candidate {
-            if c.x >= 7 || c.x < 0 || c.y <= 0 {
+            if c.x >= 7 || c.x < 0 || c.y < 0 {
                 return true;
             }
-        }
-        if with_other_rocks {
-            if self.rocks.intersection(candidate).count() > 0 {
+            if with_other_rocks && (c.y as usize) < self.rocks.len() && self.rocks[c.y as usize][c.x as usize] {
                 return true;
             }
         }
@@ -78,27 +88,14 @@ impl Chamber {
     }
 
     fn print(&self) {
-        let mut y = self.top() + 3;
-        loop {
+        for y in (0..self.rocks.len()).rev() {
             print!("|");
             for x in 0..7 {
-                print!(
-                    "{}",
-                    if self.rocks.contains(&Coord { x, y }) {
-                        '#'
-                    } else {
-                        ' '
-                    }
-                )
+                print!("{}", if self.rocks[y][x] { '#' } else { ' ' })
             }
             println!("| {}", y);
-
-            y -= 1;
-            if y == 0 {
-                println!("+-------+");
-                break;
-            }
         }
+        println!("+-------+");
     }
 }
 
@@ -147,11 +144,16 @@ const ROCKS: &[&[Coord]] = &[
 
 fn main() {
     let arg = std::env::args().nth(1).unwrap();
-    let rocks_count = std::env::args().nth(2).or(Some("2022".into())).unwrap().parse::<usize>().unwrap();
+    let rocks_count = std::env::args()
+        .nth(2)
+        .or(Some("1000000000000".into()))
+        .unwrap()
+        .parse::<usize>()
+        .unwrap();
     let file_content = std::fs::read_to_string(arg).unwrap();
     let mut jet_pattern = parse_jet_pattern(&file_content);
     let mut chamber = Chamber::new();
-    let rocks = ROCKS.iter().cycle().take(rocks_count); //1_000_000_000_000);
+    let rocks = ROCKS.iter().cycle().take(rocks_count);
     for &rock in tqdm!(rocks) {
         chamber.add_rock(&mut jet_pattern, rock);
     }
