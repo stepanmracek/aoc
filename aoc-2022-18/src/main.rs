@@ -1,10 +1,54 @@
-use std::str::FromStr;
+use std::{collections::HashSet, ops::RangeInclusive, str::FromStr};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 struct Cube {
     x: usize,
     y: usize,
     z: usize,
+}
+
+impl Cube {
+    fn neighbours(&self) -> Vec<Cube> {
+        let mut result = vec![
+            Cube {
+                x: self.x + 1,
+                y: self.y,
+                z: self.z,
+            },
+            Cube {
+                x: self.x,
+                y: self.y + 1,
+                z: self.z,
+            },
+            Cube {
+                x: self.x,
+                y: self.y,
+                z: self.z + 1,
+            },
+        ];
+        if self.x > 1 {
+            result.push(Cube {
+                x: self.x - 1,
+                y: self.y,
+                z: self.z,
+            });
+        }
+        if self.y > 1 {
+            result.push(Cube {
+                x: self.x,
+                y: self.y - 1,
+                z: self.z,
+            });
+        }
+        if self.x > 1 {
+            result.push(Cube {
+                x: self.x,
+                y: self.y,
+                z: self.z - 1,
+            });
+        }
+        result
+    }
 }
 
 struct ParseCubeError;
@@ -77,6 +121,75 @@ fn shared_faces_z(cubes: &[Cube]) -> usize {
     count
 }
 
+fn count_shared_faces(cubes: &[Cube]) -> usize {
+    shared_faces_x(cubes) + shared_faces_y(cubes) + shared_faces_z(cubes)
+}
+
+fn calc_total_area(cubes: &[Cube]) -> usize {
+    let shared_faces = count_shared_faces(&cubes[..]);
+    cubes.len() * 6 - 2 * shared_faces
+}
+
+fn get_neighbours(
+    cube: &Cube,
+    other_cubes: &HashSet<Cube>,
+    range_x: &RangeInclusive<usize>,
+    range_y: &RangeInclusive<usize>,
+    range_z: &RangeInclusive<usize>,
+) -> Vec<Cube> {
+    cube.neighbours()
+        .iter()
+        .filter(|c| {
+            !other_cubes.contains(c)
+                && range_x.contains(&c.x)
+                && range_y.contains(&c.y)
+                && range_z.contains(&c.z)
+        })
+        .cloned()
+        .collect()
+}
+
+fn flood_fill_recursive(
+    seed: Cube,
+    other_cubes: &mut HashSet<Cube>,
+    range_x: &RangeInclusive<usize>,
+    range_y: &RangeInclusive<usize>,
+    range_z: &RangeInclusive<usize>,
+) {
+    let neighbours = get_neighbours(&seed, other_cubes, range_x, range_y, range_z);
+    println!("{:?} -> {:?}", seed, neighbours);
+    other_cubes.insert(seed);
+    for neighbour in neighbours {
+        flood_fill_recursive(neighbour, other_cubes, range_x, range_y, range_z)
+    }
+}
+
+fn flood_fill(cubes: &[Cube]) -> HashSet<Cube> {
+    let range_x = cubes.iter().min_by_key(|cube| cube.x).unwrap().x
+        ..=cubes.iter().max_by_key(|cube| cube.x).unwrap().x;
+    let range_y = cubes.iter().min_by_key(|cube| cube.y).unwrap().y
+        ..=cubes.iter().max_by_key(|cube| cube.y).unwrap().y;
+    let range_z: RangeInclusive<usize> = cubes.iter().min_by_key(|cube| cube.z).unwrap().z
+        ..=cubes.iter().max_by_key(|cube| cube.z).unwrap().z;
+    println!("x: {:?}; y: {:?}; z: {:?}", range_x, range_y, range_z);
+
+    let mut other_cubes: HashSet<Cube> = cubes.iter().cloned().collect();
+    println!("before: {}", other_cubes.len());
+    flood_fill_recursive(
+        Cube { x: 0, y: 0, z: 0 },
+        &mut other_cubes,
+        &range_x,
+        &range_y,
+        &range_z,
+    );
+    other_cubes
+}
+
+fn calc_outer_area(cubes: &[Cube]) -> usize {
+    println!("{}", flood_fill(cubes).len());
+    0
+}
+
 fn main() {
     let arg = std::env::args().nth(1).unwrap();
     let cubes: Vec<Cube> = std::fs::read_to_string(arg)
@@ -86,9 +199,6 @@ fn main() {
         .filter_map(|line| line.parse().ok())
         .collect();
 
-    let shared_faces = shared_faces_x(&cubes[..])
-        + shared_faces_y(&cubes[..])
-        + shared_faces_z(&cubes[..]);
-
-    println!("{}", cubes.len() * 6 - 2 * shared_faces);
+    println!("total area: {}", calc_total_area(&cubes[..]));
+    println!("outer area: {}", calc_outer_area(&cubes[..]));
 }
