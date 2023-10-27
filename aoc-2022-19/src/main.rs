@@ -1,7 +1,7 @@
 use regex::Regex;
 use std::{num::ParseIntError, str::FromStr};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 enum Robot {
     Ore,
     Clay,
@@ -25,7 +25,6 @@ struct State {
     clays: usize,
     obsidians: usize,
     geodes: usize,
-    robots: Vec<Robot>,
 }
 
 impl Default for State {
@@ -35,76 +34,111 @@ impl Default for State {
             clays: 0,
             obsidians: 0,
             geodes: 0,
-            robots: vec![Robot::Ore],
         }
     }
 }
 
-fn round(state: &State, action: Option<Robot>, blueprint: &Blueprint) -> State {
-    let mut new_state = state.clone();
-    for robot in new_state.robots.iter() {
+fn harvest(robots: &Vec<Robot>, state: &mut State) {
+    for robot in robots.iter() {
         match robot {
-            Robot::Ore => new_state.ores += 1,
-            Robot::Clay => new_state.clays += 1,
-            Robot::Obsidian => new_state.obsidians += 1,
-            Robot::Geode => new_state.geodes += 1,
+            Robot::Ore => state.ores += 1,
+            Robot::Clay => state.clays += 1,
+            Robot::Obsidian => state.obsidians += 1,
+            Robot::Geode => state.geodes += 1,
         }
     }
-    if let Some(robot) = action {
-        match robot {
-            Robot::Ore => new_state.ores -= blueprint.ores_for_ore_robot,
-            Robot::Clay => new_state.ores -= blueprint.ores_for_clay_robot,
-            Robot::Obsidian => {
-                new_state.ores -= blueprint.ores_for_obsidian_robot;
-                new_state.clays -= blueprint.clays_for_obsidian_robot;
-            }
-            Robot::Geode => {
-                new_state.ores -= blueprint.ores_for_geode_robot;
-                new_state.obsidians -= blueprint.obsidians_for_geode_robot;
-            }
+}
+
+fn can_create(robot: &Robot, state: &State, blueprint: &Blueprint) -> bool {
+    match robot {
+        Robot::Ore => state.ores >= blueprint.ores_for_ore_robot,
+        Robot::Clay => state.ores >= blueprint.ores_for_clay_robot,
+        Robot::Obsidian => {
+            state.ores >= blueprint.ores_for_obsidian_robot
+                && state.clays >= blueprint.clays_for_obsidian_robot
         }
-        new_state.robots.push(robot);
+        Robot::Geode => {
+            state.ores >= blueprint.ores_for_geode_robot
+                && state.obsidians >= blueprint.obsidians_for_geode_robot
+        }
     }
-    new_state
 }
 
-fn get_actions(state: &State, blueprint: &Blueprint) -> Vec<Option<Robot>> {
-    let mut actions = vec![None];
-
-    if state.ores >= blueprint.ores_for_ore_robot {
-        actions.push(Some(Robot::Ore))
-    }
-    if state.ores >= blueprint.ores_for_clay_robot {
-        actions.push(Some(Robot::Clay))
-    }
-    if state.ores >= blueprint.ores_for_obsidian_robot
-        && state.clays >= blueprint.clays_for_obsidian_robot
-    {
-        actions.push(Some(Robot::Obsidian))
-    }
-    if state.ores >= blueprint.ores_for_geode_robot
-        && state.obsidians >= blueprint.obsidians_for_geode_robot
-    {
-        actions.push(Some(Robot::Geode))
-    }
-
-    actions
+fn assemble(state: &mut State, robot: &Robot, blueprint: &Blueprint) {
+    match robot {
+        Robot::Ore => state.ores -= blueprint.ores_for_ore_robot,
+        Robot::Clay => state.ores -= blueprint.ores_for_clay_robot,
+        Robot::Obsidian => {
+            state.ores -= blueprint.ores_for_obsidian_robot;
+            state.clays -= blueprint.clays_for_obsidian_robot;
+        }
+        Robot::Geode => {
+            state.ores -= blueprint.ores_for_geode_robot;
+            state.obsidians -= blueprint.obsidians_for_geode_robot;
+        }
+    };
 }
 
-fn evaluate_blueprint(depth: usize, blueprint: &Blueprint, state: &State) -> usize {
-    //println!("{}", depth);
-    if depth == 24 {
+/// based on current robots return what other robots might be assembled in future
+fn get_strategy(robots: &Vec<Robot>) -> Vec<Robot> {
+    let mut strategy = vec![];
+    if robots.contains(&Robot::Obsidian) {
+        strategy.push(Robot::Geode);
+    }
+    if robots.contains(&Robot::Clay) {
+        strategy.push(Robot::Obsidian);
+    }
+    strategy.push(Robot::Clay);
+    strategy.push(Robot::Ore);
+    strategy
+}
+
+const MAX_DEPTH: usize = 24;
+
+fn evaluate_blueprint(
+    depth: usize,
+    blueprint: &Blueprint,
+    state: State,
+    robots: Vec<Robot>,
+) -> usize {
+    let strategy = get_strategy(&robots);
+
+    if depth == MAX_DEPTH {
         return state.geodes;
     }
 
-    get_actions(state, blueprint)
-        .iter()
-        .map(|action| {
-            let new_state = round(state, action.clone(), blueprint);
-            evaluate_blueprint(depth + 1, blueprint, &new_state)
-        })
-        .max()
-        .unwrap()
+    let mut max = 0;
+    for next_robot in strategy {
+        let mut next_state = state.clone();
+        let mut next_depth = depth;
+        let mut next_robots = robots.clone();
+        while !can_create(&next_robot, &next_state, blueprint) {
+            harvest(&robots, &mut next_state);
+            next_depth += 1;
+            if next_depth == MAX_DEPTH {
+                break;
+            }
+        }
+
+        if next_depth < MAX_DEPTH {
+            harvest(&robots, &mut next_state);
+            assemble(&mut next_state, &next_robot, blueprint);
+            next_robots.push(next_robot);
+            next_depth += 1;
+        }
+
+        let value = if next_depth < MAX_DEPTH {
+            evaluate_blueprint(next_depth, blueprint, next_state, next_robots)
+        } else {
+            next_state.geodes
+        };
+
+        if value > max {
+            max = value;
+        }
+    }
+
+    max
 }
 
 #[derive(Debug)]
@@ -148,41 +182,13 @@ fn main() {
         .filter_map(|line| line.parse().ok())
         .collect();
 
-    let blueprint = &blueprints[0];
-    let state = State::default();
-    let value = evaluate_blueprint(0, blueprint, &state);
-    println!("{}", value)
-    /*let mut state = State::default();
-    let strategy: Vec<Option<Robot>> = vec![
-        None,
-        None,
-        Some(Robot::Clay),
-        None,
-        Some(Robot::Clay),
-        None,
-        Some(Robot::Clay),
-        None,
-        None,
-        None,
-        Some(Robot::Obsidian),
-        Some(Robot::Clay),
-        None,
-        None,
-        Some(Robot::Obsidian),
-        None,
-        None,
-        Some(Robot::Geode),
-        None,
-        None,
-        Some(Robot::Geode),
-        None,
-        None,
-        None,
-    ];
-    assert_eq!(strategy.len(), 24);
-    for action in strategy {
-        state = round(&state, action, blueprint);
-        println!("{:?}", state);
-        println!("-> {:?}", get_actions(&state, blueprint));
-    }*/
+    let mut result = 0;
+    for (i, blueprint) in blueprints.iter().enumerate() {
+        let state = State::default();
+        let robots = vec![Robot::Ore];
+        let value = evaluate_blueprint(0, blueprint, state, robots);
+        println!("{}: {}", i + 1, value);
+        result += (i + 1) * value;
+    }
+    println!("result: {}", result);
 }
