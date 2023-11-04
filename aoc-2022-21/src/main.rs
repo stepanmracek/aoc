@@ -107,7 +107,7 @@ fn main() {
 
         if left_delta != 0.0 && right_delta == 0.0 {
             let target_delta = init_right - init_left;
-            println!("delta achieved by increase of one: {}", left_delta);
+            println!("delta achieved by increase of {}: {}", incr_factor, left_delta);
             println!("target delta: {}", target_delta);
             let increase = incr_factor * target_delta / left_delta;
             println!("required increase of initial human value: {}", increase);
