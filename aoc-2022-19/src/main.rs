@@ -182,13 +182,13 @@ fn main() {
         .filter_map(|line| line.parse().ok())
         .collect();
 
-    let mut result = 0;
-    for (i, blueprint) in blueprints.iter().enumerate() {
+    let mut result = 1;
+    for (i, blueprint) in blueprints.iter().take(3).enumerate() {
         let state = State::default();
         let robots = vec![Robot::Ore];
         let value = evaluate_blueprint(0, blueprint, state, robots);
         println!("{}: {}", i + 1, value);
-        result += (i + 1) * value;
+        result *= value;
     }
     println!("result: {}", result);
 }
