@@ -198,14 +198,14 @@ fn get_next_on_cube_wrap(world: &World, state: &State) -> Option<State> {
     fix_initial_rc(&mut new_state, adjacent_side.dir);
 
     // Convert side-relative coordinates to the absolute coordinates within unfolded 2D map
-    new_state.row = new_state.row + 50 * adjacent_side.r;
-    new_state.col = new_state.col + 50 * adjacent_side.c;
+    new_state.row += 50 * adjacent_side.r;
+    new_state.col += 50 * adjacent_side.c;
 
     let next = &world[new_state.row][new_state.col];
     match next {
         None => panic!("Somehow we got outside of the cube :("),
-        Some(Tile::Open) => return Some(new_state),
-        Some(Tile::Wall) => return None,
+        Some(Tile::Open) => Some(new_state),
+        Some(Tile::Wall) => None,
     }
 }
 
@@ -224,8 +224,8 @@ fn get_next_on_cube_no_wrap(
     };
     match next {
         None => panic!("Somehow we got outside of the cube :("),
-        Some(Tile::Open) => return Some(next_state),
-        Some(Tile::Wall) => return None,
+        Some(Tile::Open) => Some(next_state),
+        Some(Tile::Wall) => None,
     }
 }
 
