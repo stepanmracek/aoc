@@ -266,10 +266,10 @@ fn get_next_on_cube(world: &World, state: &State) -> Option<State> {
 
 /// Function returns for given cube side adjacent side and other indicators needed in the implementation
 /// of `get_next_on_cube_wrap()`
-/// 
+///
 /// This function is not generic for any arbitrary unfolded cube, but only to the one given in my
 /// puzzle input:
-/// 
+///
 /// ```txt
 ///       +-----+-----+
 ///       |(0,1)|(0,2)|
@@ -281,8 +281,8 @@ fn get_next_on_cube(world: &World, state: &State) -> Option<State> {
 /// |(3,0)|
 /// +-----+
 /// ```
-/// 
-/// For example if we are moving from the side `(0,1)` to the left, the resulint structure is:
+///
+/// For example if we are moving from the side `(0,1)` to the left, the resuling structure is:
 /// - side row: 2
 /// - side col: 0
 /// - we will continue on that side oriented to the right
@@ -476,7 +476,10 @@ fn get_adjacent_side(side_row: usize, side_col: usize, orientation: Orientation)
             },
         }
     } else {
-        panic!()
+        panic!(
+            "Movement from r:{}, c:{}, {:?} not implemented!",
+            side_row, side_col, orientation
+        )
     }
 }
 
