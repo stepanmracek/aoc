@@ -2,6 +2,8 @@ use kdam::tqdm;
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
 
+const TIME: usize = 26;
+
 #[derive(Debug)]
 struct Valve<'a> {
     name: &'a str,
@@ -111,7 +113,7 @@ fn precompute_distances<'a>(valves: &'a Valves) -> Distances<'a> {
 fn simulate<'a>(route: &Vec<&str>, distances: &Distances, valves: &Valves) -> i32 {
     let mut released_pressure = 0;
     let mut increase = 0;
-    let mut time_left = 30;
+    let mut time_left = TIME;
     let mut cur_valve = "AA";
     let mut opened_valves: Vec<&str> = vec![];
     let mut route_iter = route.iter();
@@ -152,10 +154,10 @@ fn generate_paths<'a>(
     distances: &Distances,
 ) -> Vec<Vec<&'a str>> {
     let mut result = vec![];
-    if cur_distance > 30 {
+    if cur_distance > TIME {
         panic!()
     }
-    if !avail_nodes.is_empty() && cur_distance < 30 {
+    if !avail_nodes.is_empty() && cur_distance < TIME {
         let mut recursion = false;
         for n in &avail_nodes {
             let mut new_avail_nodes = avail_nodes.clone();
@@ -169,8 +171,8 @@ fn generate_paths<'a>(
                 (*cur_path.last().unwrap(), *n)
             };
             let new_distance = cur_distance + distances.get(&key).unwrap() + 1;
-            if new_distance <= 30 {
-                recursion = true; 
+            if new_distance <= TIME {
+                recursion = true;
                 result.extend(generate_paths(
                     new_path,
                     new_distance,
@@ -185,6 +187,31 @@ fn generate_paths<'a>(
     } else {
         result.push(cur_path);
     }
+    result
+}
+
+fn generate_paths_for_two<'a>(
+    first_path: Vec<&'a str>,
+    second_path: Vec<&'a str>,
+    first_distance: usize,
+    second_distance: usize,
+    avail_nodes: HashSet<&'a str>,
+    distances: &Distances,
+) -> (Vec<Vec<&'a str>>,Vec<Vec<&'a str>>) {
+    let mut result = (vec![], vec![]);
+    if first_distance > TIME || second_distance > TIME {
+        panic!()
+    }
+
+    if !avail_nodes.is_empty() {
+        for avail_node in &avail_nodes {
+
+        }
+
+    }
+
+
+
     result
 }
 
@@ -213,6 +240,7 @@ fn main() {
     let paths = generate_paths(cur_path, 0, avail_nodes, &distances);
 
     let result: i32 = tqdm!(paths.iter())
+        .inspect(|path| println!("{:?}", path))
         .map(|path| simulate(path, &distances, &valves))
         .max()
         .unwrap();
