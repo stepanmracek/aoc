@@ -5,7 +5,6 @@ use std::{
 
 #[derive(Debug)]
 struct Card {
-    //id: i32,
     winning: HashSet<i32>,
     owned: HashSet<i32>,
 }
@@ -17,14 +16,6 @@ impl FromStr for Card {
     type Err = CardParseError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (_card_id, numbers) = s.split_once(": ").ok_or(CardParseError {})?;
-        /*let id: i32 = card_id
-        .split_once(' ')
-        .ok_or(CardParseError {})?
-        .1
-        .trim()
-        .parse()
-        .map_err(|_| CardParseError {})?;*/
-
         let (winning, owned) = numbers.split_once(" | ").ok_or(CardParseError {})?;
         let winning: Result<HashSet<i32>, _> = winning
             .split(' ')
@@ -38,7 +29,6 @@ impl FromStr for Card {
             .collect();
 
         Ok(Card {
-            //id,
             owned: owned.map_err(|_| CardParseError {})?,
             winning: winning.map_err(|_| CardParseError {})?,
         })
