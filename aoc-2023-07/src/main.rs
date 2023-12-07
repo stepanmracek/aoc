@@ -28,6 +28,27 @@ impl Hand {
         }
     }
 
+    fn get_kind_using_joker(&self) -> u8 {
+        // replace all jokers with card that has most occurences
+        let other_cards: Counter<u8, usize> =
+            Counter::from_iter(self.cards.iter().filter(|c| **c != 1).cloned());
+
+        if other_cards.len() == 0 {
+            return 6; // Five jokers of a kind
+        }
+
+        let most_common_card = other_cards.most_common()[0].0;
+
+        let new_cards = self
+            .cards
+            .iter()
+            .map(|&c| if c == 1 { most_common_card } else { c })
+            .collect();
+
+        let new_hand = Hand { cards: new_cards };
+        return new_hand.get_kind();
+    }
+
     fn compare_same_kind(&self, other: &Self) -> Ordering {
         for (self_card, other_card) in std::iter::zip(self.cards.iter(), other.cards.iter()) {
             if self_card != other_card {
@@ -45,8 +66,8 @@ struct Row {
 
 impl Ord for Row {
     fn cmp(&self, other: &Self) -> Ordering {
-        let self_kind = self.hand.get_kind();
-        let other_kind = other.hand.get_kind();
+        let self_kind = self.hand.get_kind_using_joker();
+        let other_kind = other.hand.get_kind_using_joker();
         if self_kind != other_kind {
             return self_kind.cmp(&other_kind);
         }
@@ -75,7 +96,7 @@ fn parse_hand(s: &str) -> Hand {
         .filter_map(|c| match c {
             '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' => c.to_string().parse().ok(),
             'T' => Some(10),
-            'J' => Some(11),
+            'J' => Some(1), // Joker
             'Q' => Some(12),
             'K' => Some(13),
             'A' => Some(14),
