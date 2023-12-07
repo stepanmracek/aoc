@@ -8,18 +8,21 @@ struct Hand {
 impl Hand {
     fn get_kind(&self) -> u8 {
         let counter: Counter<u8, usize> = Counter::from_iter(self.cards.iter().cloned());
-        let mut occurences: Vec<usize> = counter.values().cloned().collect();
-        occurences.sort();
+        let occurences: Vec<usize> = counter
+            .most_common()
+            .iter()
+            .map(|(_, count)| *count)
+            .collect();
 
         if occurences == vec![5] {
             return 6; // Five of a kind
-        } else if occurences == vec![1, 4] {
+        } else if occurences == vec![4, 1] {
             return 5; // Four of a kind
-        } else if occurences == vec![2, 3] {
+        } else if occurences == vec![3, 2] {
             return 4; // Full house
-        } else if occurences == vec![1, 1, 3] {
+        } else if occurences == vec![3, 1, 1] {
             return 3; // Three of a kind
-        } else if occurences == vec![1, 2, 2] {
+        } else if occurences == vec![2, 2, 1] {
             return 2; // Two pair
         } else if counter.len() == 5 {
             return 0; // High card
@@ -36,7 +39,7 @@ impl Hand {
             return 6; // Five jokers of a kind
         }
 
-        let most_common_card = other_cards.most_common()[0].0;
+        let most_common_card = other_cards.k_most_common_ordered(1)[0].0;
         let new_cards = self
             .cards
             .iter()
