@@ -32,13 +32,11 @@ impl Hand {
         // replace all jokers with card that has most occurences
         let other_cards: Counter<u8, usize> =
             Counter::from_iter(self.cards.iter().filter(|c| **c != 1).cloned());
-
         if other_cards.len() == 0 {
             return 6; // Five jokers of a kind
         }
 
         let most_common_card = other_cards.most_common()[0].0;
-
         let new_cards = self
             .cards
             .iter()
@@ -94,13 +92,12 @@ fn parse_hand(s: &str) -> Hand {
         .trim()
         .chars()
         .filter_map(|c| match c {
-            '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' => c.to_string().parse().ok(),
             'T' => Some(10),
             'J' => Some(1), // Joker
             'Q' => Some(12),
             'K' => Some(13),
             'A' => Some(14),
-            _ => None,
+            _ => c.to_string().parse().ok(),
         })
         .collect();
 
