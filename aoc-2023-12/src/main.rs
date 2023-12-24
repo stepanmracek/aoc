@@ -1,4 +1,4 @@
-use std::{fmt::Display, ops::RangeInclusive, str::FromStr};
+use std::{collections::HashMap, fmt::Display, str::FromStr};
 
 #[derive(Debug, PartialEq, Clone)]
 enum Spring {
@@ -34,7 +34,7 @@ impl FromStr for Row {
     }
 }
 
-fn springs_to_string(springs: &Vec<Spring>) -> String {
+fn springs_to_string(springs: &[Spring]) -> String {
     springs
         .iter()
         .map(|v| match v {
@@ -56,135 +56,61 @@ impl Display for Row {
     }
 }
 
-fn append(candidate_springs: &mut Vec<Spring>, oper_count: usize, dmg_count: usize) {
-    for _ in 0..oper_count {
-        candidate_springs.push(Spring::Operational);
-    }
-    for _ in 0..dmg_count {
-        candidate_springs.push(Spring::Damaged);
-    }
-}
-
-fn append_many(
-    candidate_springs: &Vec<Spring>,
-    oper_range: RangeInclusive<usize>,
-    dmg_count: usize,
-) -> Vec<Vec<Spring>> {
-    let mut result = vec![];
-    for oper_count in oper_range {
-        let mut c = candidate_springs.clone();
-        append(&mut c, oper_count, dmg_count);
-        result.push(c);
-    }
-    result
-}
-
 impl Row {
-    fn generate_arrangements(&self) -> Vec<Vec<Spring>> {
-        let mut result = vec![];
+    fn count_arrangements(&self) -> usize {
+        let mut cache: HashMap<(usize, usize, usize), usize> = HashMap::new();
+        self.count_arrangements_recursive(&mut cache, 0, 0, 0)
+    }
 
-        let row_len = self.springs.len();
-        let damaged_count: usize = self.checksum.iter().sum();
-        let operational_count = row_len - damaged_count;
-        let damaged_groups_count = self.checksum.len();
-        //println!("operational_count {}", operational_count);
+    fn count_arrangements_recursive(
+        &self,
+        cache: &mut HashMap<(usize, usize, usize), usize>,
+        pos: usize,
+        block_index: usize,
+        block_pos: usize,
+    ) -> usize {
+        let key = (pos, block_index, block_pos);
+        if let Some(cached) = cache.get(&key) {
+            return *cached;
+        }
+        if pos == self.springs.len() {
+            let valid_over_last_block = block_index == self.checksum.len() && block_pos == 0;
+            let valid =
+                block_index == self.checksum.len() - 1 && self.checksum[block_index] == block_pos;
 
-        let max_initial_operational = operational_count - (damaged_groups_count - 1);
-        //println!("max_initial_operational {}", max_initial_operational);
-        for initial_operational in 0..=max_initial_operational {
-            let mut candidate: Vec<Spring> = vec![];
-            append(&mut candidate, initial_operational, self.checksum[0]);
-            //let remaining_operational = operational_count - initial_operational;
-            let check = self.check(&candidate);
-            /*println!(
-                "initial_operational {}, remaining_operational {}, candidate {} => {}",
-                initial_operational,
-                remaining_operational,
-                springs_to_string(&candidate),
-                check
-            );*/
-            if !check {
-                continue;
+            if valid || valid_over_last_block {
+                return 1;
+            } else {
+                return 0;
             }
-
-            let remaining_damaged_groups = &self.checksum[1..];
-            let arrangements = self.gen_recursive_arrangements(
-                &candidate,
-                operational_count,
-                remaining_damaged_groups,
-            );
-
-            result.extend(
-                arrangements
-                    .iter()
-                    .filter(|a| a.len() == self.springs.len())
-                    .cloned(),
-            );
         }
 
-        result
-    }
-
-    fn gen_recursive_arrangements(
-        &self,
-        candidate: &Vec<Spring>,
-        max_operational: usize,
-        remaining_damaged_groups: &[usize],
-    ) -> Vec<Vec<Spring>> {
-        let mut result = vec![];
-
-        let remaining_operational = max_operational
-            - candidate
-                .iter()
-                .filter(|&v| v == &Spring::Operational)
-                .count();
-        if remaining_damaged_groups.len() > 0 {
-            let max_oper_count = remaining_operational - (remaining_damaged_groups.len() - 1);
-            let oper_range = 1..=max_oper_count;
-            let candidates = append_many(candidate, oper_range, remaining_damaged_groups[0]);
-            /*println!(
-                "gen_recursive_arrangements {}",
-                springs_to_string(candidate)
-            );
-            println!("gen_recursive_arrangements candidates: {}; remaining_operational: {}; remaining_damaged_groups.len(): {}", candidates.len(), remaining_operational, remaining_damaged_groups.len());*/
-            for c in candidates.iter() {
-                let check = self.check(c);
-                //println!("  {} => {}", springs_to_string(c), check);
-                if check {
-                    // && remaining_damaged_groups[1..].len() > 0
-                    result.extend(
-                        self.gen_recursive_arrangements(
-                            c,
-                            max_operational,
-                            &remaining_damaged_groups[1..],
-                        )
-                        .iter()
-                        .cloned(),
-                    )
+        let mut result = 0;
+        for substitute in [Spring::Operational, Spring::Damaged] {
+            if self.springs[pos] == substitute || self.springs[pos] == Spring::Unknown {
+                if substitute == Spring::Operational && block_pos == 0 {
+                    // just move to the next spring
+                    result += self.count_arrangements_recursive(cache, pos + 1, block_index, 0);
+                } else if substitute == Spring::Operational
+                    && block_pos > 0
+                    && block_index < self.checksum.len()
+                    && self.checksum[block_index] == block_pos
+                {
+                    // block of damaged springs ended -> increment block_index
+                    result += self.count_arrangements_recursive(cache, pos + 1, block_index + 1, 0);
+                } else if substitute == Spring::Damaged {
+                    // next damaged spring in a sequence of damaged springs -> increment block_pos
+                    result += self.count_arrangements_recursive(
+                        cache,
+                        pos + 1,
+                        block_index,
+                        block_pos + 1,
+                    );
                 }
             }
-        } else {
-            //println!("No more damaged groups left, appending just remaining operational springs");
-            let mut c = candidate.clone();
-            for _ in 0..remaining_operational {
-                c.push(Spring::Operational);
-            }
-            if self.check(&c) {
-                result.push(c);
-            }
         }
-
+        cache.insert(key, result);
         result
-    }
-
-    #[allow(dead_code)]
-    fn check(&self, candidate: &Vec<Spring>) -> bool {
-        for (template, candidate) in std::iter::zip(self.springs.iter(), candidate) {
-            if template != &Spring::Unknown && template != candidate {
-                return false;
-            }
-        }
-        return true;
     }
 
     fn extend(&self) -> Self {
@@ -204,21 +130,16 @@ impl Row {
 }
 
 fn main() {
-    let file_content = std::fs::read_to_string(std::env::args().nth(1).unwrap()).unwrap();
+    let path = std::env::args()
+        .nth(1)
+        .expect("Missing input file argument");
+    let file_content = std::fs::read_to_string(path).expect("Can't read input file");
     let rows: Vec<Row> = file_content
-        .split('\n')
+        .lines()
         .filter_map(|s| s.parse::<Row>().ok())
         .collect();
 
-    /*let result: usize = rows.iter().map(|r| r.generate_arrangements().len()).sum();
-    println!("{}", result);*/
-
-    for row in rows {
-        println!("{}", row);
-        println!("{}", row.generate_arrangements().len());
-        let row = row.extend();
-        println!("{}", row);
-        println!("{}", row.generate_arrangements().len());
-        println!();
-    }
+    let iterator = rows.iter().map(|row| row.extend().count_arrangements());
+    let result: usize = iterator.sum();
+    println!("{}", result);
 }
