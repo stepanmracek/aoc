@@ -123,12 +123,12 @@ fn main() {
 
     let world = file_content
         .split("\n\n")
-        .map(|s| parse_pattern(s))
+        .map(parse_pattern)
         .collect::<Vec<Pattern>>();
 
     let mut result = 0;
     for p in world.iter() {
-        print_pattern(&p);
+        print_pattern(p);
         let symmetry = get_symmetry(p);
         println!("{:?}", symmetry);
 
