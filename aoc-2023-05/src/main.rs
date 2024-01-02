@@ -54,7 +54,7 @@ impl Maps {
     fn map_range(&self, range: &Range<usize>) -> Vec<Range<usize>> {
         let mut ans = vec![];
 
-        if self.maps.len() == 0 {
+        if self.maps.is_empty() {
             return ans;
         }
 
@@ -93,7 +93,7 @@ impl Maps {
             let start = range.start.clamp(last_source_range.end, range.end);
             ans.push(start..range.end);
         }
-        return ans;
+        ans
     }
 }
 
@@ -108,7 +108,7 @@ fn seed_to_location(seed: usize, maps: &Vec<Maps>) -> usize {
 impl FromStr for Maps {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (name, maps) = s.split_once(":\n").ok_or_else(|| "Maps parse error")?;
+        let (name, maps) = s.split_once(":\n").ok_or("Maps parse error")?;
         let maps: Result<Vec<Map>, String> = maps.lines().map(|line| line.parse()).collect();
         let mut maps = maps?;
         maps.sort_by_key(|m| m.source_range.start);
@@ -127,7 +127,7 @@ impl FromStr for Maps {
                 });
             }
         }
-        maps.extend(missing.into_iter());
+        maps.extend(missing);
         maps.sort_by_key(|m| m.source_range.start);
 
         Ok(Maps {
@@ -148,14 +148,14 @@ fn parse_seed_ranges(s: &str) -> Vec<Range<usize>> {
     result
 }
 
-fn find_min(input_range: &Range<usize>, maps: &Vec<Maps>, depth: usize) -> usize {
-    let ranges = maps[depth].map_range(input_range);
-    if depth == maps.len() - 1 {
+fn find_min(input_range: &Range<usize>, maps: &[Maps]) -> usize {
+    let ranges = maps[0].map_range(input_range);
+    if maps.len() == 1 {
         ranges.iter().map(|r| r.start).min().unwrap()
     } else {
         ranges
             .iter()
-            .map(|r| find_min(r, maps, depth + 1))
+            .map(|r| find_min(r, &maps[1..]))
             .min()
             .unwrap()
     }
@@ -197,7 +197,7 @@ fn main() {
     let stamp = Instant::now();
     let result = seed_ranges
         .iter()
-        .map(|range| find_min(range, &maps, 0))
+        .map(|range| find_min(range, &maps))
         .min()
         .unwrap();
     let elapsed = Instant::now() - stamp;
